@@ -29,7 +29,7 @@ function SchoolRegistrationsPage() {
       <DataTable
         data={rows as unknown as Array<{ id: string } & Record<string, unknown>>}
         columns={[
-          { header: "Event", cell: (r: unknown) => (r as { event: { name: string } }).event.name },
+          { header: "Event", cell: (r: unknown) => (r as unknown as { event: { name: string } }).event.name },
           {
             header: "Entrant",
             cell: (r: unknown) => {
@@ -37,7 +37,7 @@ function SchoolRegistrationsPage() {
               return row.student ? `${row.student.firstName} ${row.student.lastName}` : row.team?.name ?? "Team";
             },
           },
-          { header: "Status", cell: (r: unknown) => (r as { status: string }).status },
+          { header: "Status", cell: (r: unknown) => (r as unknown as { status: string }).status },
         ]}
         emptyMessage={q.isLoading ? "Loading…" : "No registrations"}
       />

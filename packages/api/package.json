@@ -14,6 +14,7 @@
     "@enthu/auth": "workspace:*",
     "@enthu/db": "workspace:*",
     "@enthu/env": "workspace:*",
+    "@enthu/validators": "workspace:*",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",

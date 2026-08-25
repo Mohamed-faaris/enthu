@@ -1,0 +1,19 @@
+{
+  "name": "@enthu/validators",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@enthu/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

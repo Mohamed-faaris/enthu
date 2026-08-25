@@ -15,6 +15,7 @@
     "@enthu/db": "workspace:*",
     "@enthu/env": "workspace:*",
     "@enthu/validators": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "dotenv": "catalog:",

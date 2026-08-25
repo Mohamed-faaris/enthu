@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { trpc } from "@/utils/trpc";
@@ -11,6 +11,7 @@ import { TeamBuilder } from "@/components/teams/TeamBuilder";
 import { EligibilityBadge } from "./EligibilityBadge";
 import { OverrideWarningBanner } from "./OverrideWarningBanner";
 import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
 
 type Props = {
   isAdminContext?: boolean;
@@ -30,8 +31,14 @@ type Props = {
 export function RegistrationForm({ isAdminContext = false, initialData }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const session = authClient.useSession();
+  const sessionSchoolId = (session.data?.user as unknown as { schoolId?: string } | undefined)?.schoolId ?? null;
   const [schoolId, setSchoolId] = useState(initialData?.schoolId ?? "");
   const [eventId, setEventId] = useState(initialData?.eventId ?? "");
+
+  useEffect(() => {
+    if (!isAdminContext && !initialData?.schoolId && sessionSchoolId && !schoolId) setSchoolId(sessionSchoolId);
+  }, [sessionSchoolId, isAdminContext, initialData?.schoolId, schoolId]);
   const [studentId, setStudentId] = useState<string | null>(initialData?.studentId ?? null);
   const [teamId, setTeamId] = useState<string | null>(initialData?.teamId ?? null);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>(initialData?.teamMemberIds ?? []);
@@ -93,7 +100,7 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
   return (
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {isAdminContext && (
+        {isAdminContext ? (
           <div className="space-y-2">
             <Label>School *</Label>
             <select
@@ -114,6 +121,11 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
                 </option>
               ))}
             </select>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>School</Label>
+            <p className="text-sm text-muted-foreground">{schoolId || sessionSchoolId || "—"}</p>
           </div>
         )}
 

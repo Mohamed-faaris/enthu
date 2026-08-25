@@ -44,6 +44,7 @@
         "@enthu/api": "workspace:*",
         "@enthu/env": "workspace:*",
         "@enthu/ui": "workspace:*",
+        "@enthu/validators": "workspace:*",
         "@tailwindcss/vite": "^4.3.3",
         "@tanstack/react-form": "^1.33.2",
         "@tanstack/react-query": "^5.101.4",
@@ -83,9 +84,11 @@
         "@enthu/auth": "workspace:*",
         "@enthu/db": "workspace:*",
         "@enthu/env": "workspace:*",
+        "@enthu/validators": "workspace:*",
         "@trpc/client": "catalog:",
         "@trpc/server": "catalog:",
         "dotenv": "catalog:",
+        "drizzle-orm": "^0.45.2",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -165,6 +168,16 @@
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
         "tailwindcss": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/validators": {
+      "name": "@enthu/validators",
+      "dependencies": {
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@enthu/config": "workspace:*",
         "typescript": "catalog:",
       },
     },
@@ -425,6 +438,8 @@
     "@enthu/env": ["@enthu/env@workspace:packages/env"],
 
     "@enthu/ui": ["@enthu/ui@workspace:packages/ui"],
+
+    "@enthu/validators": ["@enthu/validators@workspace:packages/validators"],
 
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
 

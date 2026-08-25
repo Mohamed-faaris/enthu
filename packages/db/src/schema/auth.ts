@@ -1,5 +1,28 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  pgEnum,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uuid,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+import { schools, events } from "./schema";
+
+/* ------------------------------------------------------------------ */
+/*  Roles                                                              */
+/* ------------------------------------------------------------------ */
+
+export const roleEnum = pgEnum("role", [
+  "admin",
+  "school_spoc",
+  "certificate_writer",
+  "event_coordinator",
+  "result_announcer",
+]);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -7,12 +30,42 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+
+  role: roleEnum("role").notNull().default("school_spoc"),
+
+  schoolId: uuid("school_id").references(() => schools.id, {
+    onDelete: "cascade",
+  }),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+/* ------------------------------------------------------------------ */
+/*  Event coordinator assignments                                      */
+/* ------------------------------------------------------------------ */
+
+export const eventCoordinators = pgTable(
+  "event_coordinators",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    canEdit: boolean("can_edit").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("event_coordinator_unique").on(table.userId, table.eventId),
+    index("event_coordinators_event_idx").on(table.eventId),
+  ],
+);
 
 export const session = pgTable(
   "session",
@@ -37,7 +90,6 @@ export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -55,10 +107,7 @@ export const account = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [
-    uniqueIndex("account_issuer_accountId_uidx").on(table.issuer, table.accountId),
-    index("account_userId_idx").on(table.userId),
-  ],
+  (table) => [index("account_userId_idx").on(table.userId)],
 );
 
 export const verification = pgTable(
@@ -77,10 +126,30 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
+/* ------------------------------------------------------------------ */
+/*  Relations                                                          */
+/* ------------------------------------------------------------------ */
+
+export const userRelations = relations(user, ({ one, many }) => ({
   sessions: many(session),
   accounts: many(account),
+  school: one(schools, { fields: [user.schoolId], references: [schools.id] }),
+  coordinatedEvents: many(eventCoordinators),
 }));
+
+export const eventCoordinatorsRelations = relations(
+  eventCoordinators,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [eventCoordinators.userId],
+      references: [user.id],
+    }),
+    event: one(events, {
+      fields: [eventCoordinators.eventId],
+      references: [events.id],
+    }),
+  }),
+);
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {

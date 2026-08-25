@@ -1,0 +1,3 @@
+{
+  "extends": "@enthu/config/tsconfig.base.json"
+}

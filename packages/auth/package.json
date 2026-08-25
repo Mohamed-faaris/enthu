@@ -1,0 +1,24 @@
+{
+  "name": "@enthu/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@enthu/db": "workspace:*",
+    "@enthu/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@enthu/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

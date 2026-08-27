@@ -1,10 +1,8 @@
-import { and, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { hashPassword } from "better-auth/crypto";
 import { z } from "zod";
 import { db } from "@enthu/db";
-import { account, user } from "@enthu/db/schema";
+import { user } from "@enthu/db/schema";
 import { auth } from "@enthu/auth";
 import { adminProcedure, protectedProcedure, router } from "../index";
 
@@ -40,47 +38,38 @@ export const usersRouter = router({
       schoolId: z.string().uuid().nullable().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      let created: { user: { id: string } };
       try {
-        created = await auth.api.signUpEmail({
-          body: { name: input.name, email: input.email, password: input.password },
+        const created = await auth.api.createUser({
+          body: {
+            name: input.name,
+            email: input.email,
+            password: input.password,
+            role: input.role,
+            data: input.schoolId ? { schoolId: input.schoolId } : undefined,
+          },
           headers: ctx.headers,
-        });
+        } as never);
+        return (created as unknown as { user: { id: string; name: string; email: string; role: string } }).user;
       } catch (e) {
         const message = (e as { message?: string })?.message ?? "Failed to create user";
         throw new TRPCError({ code: "BAD_REQUEST", message });
       }
-      const [updated] = await db
-        .update(user)
-        .set({ role: input.role, schoolId: input.schoolId ?? null })
-        .where(eq(user.id, created.user.id))
-        .returning();
-      return updated;
     }),
   setPassword: adminProcedure
     .input(z.object({
       userId: z.string(),
       password: z.string().min(8, "Password must be at least 8 characters"),
     }))
-    .mutation(async ({ input }) => {
-      const hash = await hashPassword(input.password);
-      const existing = await db.query.account.findFirst({
-        where: and(eq(account.userId, input.userId), eq(account.providerId, "credential")),
-      });
-      if (existing) {
-        await db.update(account).set({ password: hash, updatedAt: new Date() }).where(eq(account.id, existing.id));
-      } else {
-        await db.insert(account).values({
-          id: randomUUID(),
-          issuer: "credential",
-          accountId: input.userId,
-          providerId: "credential",
-          userId: input.userId,
-          password: hash,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+    .mutation(async ({ input, ctx }) => {
+      try {
+        await auth.api.setUserPassword({
+          body: { userId: input.userId, newPassword: input.password },
+          headers: ctx.headers,
         });
+        return { success: true as const };
+      } catch (e) {
+        const message = (e as { message?: string })?.message ?? "Failed to update password";
+        throw new TRPCError({ code: "BAD_REQUEST", message });
       }
-      return { success: true as const };
     }),
 });

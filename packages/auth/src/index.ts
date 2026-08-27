@@ -1,6 +1,7 @@
 import { createDb } from "@enthu/db";
 import * as schema from "@enthu/db/schema/auth";
 import { env } from "@enthu/env/server";
+import { admin } from "better-auth/plugins";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
@@ -20,12 +21,6 @@ export function createAuth() {
     },
     user: {
       additionalFields: {
-        role: {
-          type: "string",
-          required: false,
-          defaultValue: "school_spoc",
-          input: false,
-        },
         schoolId: {
           type: "string",
           required: false,
@@ -42,7 +37,7 @@ export function createAuth() {
         httpOnly: true,
       },
     },
-    plugins: [],
+    plugins: [admin({ adminRoles: ["admin"], defaultRole: "school_spoc" })],
   });
 }
 

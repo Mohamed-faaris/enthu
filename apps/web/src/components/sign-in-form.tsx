@@ -28,11 +28,20 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: ()
           password: value.password,
         },
         {
-          onSuccess: () => {
-            navigate({
-              to: "/dashboard",
-            });
+          onSuccess: async () => {
             toast.success("Sign in successful");
+            // role-based redirect: admin → /admin, school → /school, else /dashboard
+            try {
+              const { data } = await authClient.getSession();
+              const role = (data?.user as unknown as { role?: string } | undefined)?.role;
+              if (role === "admin") navigate({ to: "/admin" });
+              else if (role === "school_spoc") navigate({ to: "/school/registrations" });
+              else if (role === "event_coordinator") navigate({ to: "/coordinator" });
+              else if (role === "result_announcer") navigate({ to: "/announcer" });
+              else navigate({ to: "/dashboard" });
+            } catch {
+              navigate({ to: "/dashboard" });
+            }
           },
           onError: (error) => {
             toast.error(error.error.message || error.error.statusText);

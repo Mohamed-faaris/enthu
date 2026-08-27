@@ -35,11 +35,15 @@
     "db:push": "turbo run db:push -F @enthu/db --",
     "db:studio": "turbo run db:studio -F @enthu/db --",
     "db:generate": "turbo run db:generate -F @enthu/db --",
-    "db:migrate": "turbo run db:migrate -F @enthu/db --"
+    "db:migrate": "turbo run db:migrate -F @enthu/db --",
+    "db:seed": "turbo run db:seed -F @enthu/db --"
   },
   "dependencies": {
     "@enthu/env": "workspace:*",
+    "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.23.0",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -6,7 +6,10 @@
       "name": "enthu",
       "dependencies": {
         "@enthu/env": "workspace:*",
+        "better-auth": "catalog:",
         "dotenv": "catalog:",
+        "drizzle-orm": "^0.45.2",
+        "pg": "^8.23.0",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -119,6 +122,7 @@
       "name": "@enthu/db",
       "dependencies": {
         "@enthu/env": "workspace:*",
+        "better-auth": "catalog:",
         "dotenv": "catalog:",
         "drizzle-orm": "^0.45.2",
         "pg": "^8.22.0",

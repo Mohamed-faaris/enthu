@@ -11,7 +11,6 @@ import { RegistrationForm } from "@/components/registration/RegistrationForm";
 import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/school/registrations/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(trpc.registrations.schoolList.queryOptions()),
   component: SchoolRegistrationsPage,
 });
 
@@ -21,23 +20,37 @@ function SchoolRegistrationsPage() {
   const localSchoolId = typeof window !== "undefined" ? localStorage.getItem("schoolId") ?? "" : "";
   const schoolId = sessionSchoolId || localSchoolId;
   const qc = useQueryClient();
-  const eventsQ = useQuery(trpc.events.list.queryOptions());
-  const regsQ = useQuery(trpc.registrations.schoolList.queryOptions());
+  const eventsQ = useQuery(trpc.events.publicList.queryOptions());
+  const regsQ = useQuery({
+    ...trpc.registrations.publicListBySchool.queryOptions({ schoolId: schoolId || "00000000-0000-0000-0000-000000000000" }),
+    enabled: !!schoolId,
+  });
 
   const events = (eventsQ.data as unknown as Array<{ id: string; name: string; category: { name: string }; gender: string; eventType: string; scoringType: string }> | undefined) ?? [];
   const regs = (regsQ.data as unknown as Array<any> | undefined) ?? [];
 
   const [search, setSearch] = useState("");
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
 
   const filteredEvents = events.filter((e) => !search || e.name.toLowerCase().includes(search.toLowerCase()));
   const getRegsForEvent = (eventId: string) => regs.filter((r: any) => r.eventId === eventId || r.event?.id === eventId);
+
+  if (!schoolId) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-medium">My registrations — by event</h2>
+        <p className="text-sm text-muted-foreground">Please login via School Login with your school code to view registrations.</p>
+        <p className="text-xs text-muted-foreground">No school selected. Go to <a href="/" className="underline">Enthusia Portal → School Login</a></p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-medium">My registrations — by event</h2>
-        <p className="text-sm text-muted-foreground">All events with empty table + to add. School fixed, student/team auto-created inline. Always confirmed.</p>
+        <p className="text-sm text-muted-foreground">All events with empty table + to add. School fixed ({schoolId.slice(0, 8)}…), student/team auto-created inline. Always confirmed.</p>
       </div>
 
       <Input placeholder="Search events…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
@@ -68,6 +81,14 @@ function SchoolRegistrationsPage() {
                         cell: (r: any) => r.student ? r.student.name : r.team ? `${r.team.name ?? "Team"} (${r.team.members?.length ?? 0})` : "—",
                       },
                       { header: "Created", cell: (r: any) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—" },
+                      {
+                        header: "Actions",
+                        cell: (r: any) => (
+                          <button onClick={() => setEditing(r)} className="text-xs text-primary hover:underline">
+                            Edit
+                          </button>
+                        ),
+                      },
                     ]}
                     emptyMessage="No registrations yet — click + to add"
                   />
@@ -89,7 +110,48 @@ function SchoolRegistrationsPage() {
               <RegistrationForm isAdminContext={false} fixedSchoolId={schoolId} fixedEventId={activeEventId} />
             </div>
             <div className="mt-3 flex justify-end">
-              <Button variant="outline" onClick={async () => { await qc.invalidateQueries({ queryKey: trpc.registrations.schoolList.queryKey() }); setActiveEventId(null); }}>Close</Button>
+              <Button variant="outline" onClick={async () => { await qc.invalidateQueries({ queryKey: trpc.registrations.publicListBySchool.queryKey({ schoolId }) }); await qc.invalidateQueries({ queryKey: trpc.registrations.schoolList.queryKey() }); setActiveEventId(null); }}>Close</Button>
+            </div>
+          </>
+        )}
+      </Dialog>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        {editing && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Edit registration — {editing.event?.name ?? events.find((e) => e.id === editing.eventId)?.name ?? ""}</DialogTitle>
+              <DialogDescription>Only your school registrations — school fixed, event fixed</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[70vh] overflow-y-auto pr-1">
+              <RegistrationForm
+                isAdminContext={false}
+                fixedSchoolId={schoolId}
+                fixedEventId={editing.eventId}
+                initialData={{
+                  id: editing.id,
+                  schoolId: editing.schoolId,
+                  eventId: editing.eventId,
+                  studentId: editing.studentId,
+                  teamId: editing.teamId,
+                  teamMemberIds: editing.team?.members?.map((m: any) => m.studentId) ?? [],
+                  teamName: editing.team?.name ?? null,
+                  status: "confirmed",
+                  overrideReason: null,
+                }}
+              />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  await qc.invalidateQueries({ queryKey: trpc.registrations.publicListBySchool.queryKey({ schoolId }) });
+                  await qc.invalidateQueries({ queryKey: trpc.registrations.schoolList.queryKey() });
+                  setEditing(null);
+                }}
+              >
+                Close
+              </Button>
             </div>
           </>
         )}

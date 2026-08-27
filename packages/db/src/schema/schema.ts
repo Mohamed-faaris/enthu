@@ -57,26 +57,16 @@ export const schools = pgTable("schools", {
 /*  Students                                                           */
 /* ------------------------------------------------------------------ */
 
-export const students = pgTable(
-  "students",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    schoolId: uuid("school_id")
-      .notNull()
-      .references(() => schools.id, { onDelete: "cascade" }),
-    name: varchar("name", { length: 200 }).notNull(),
-    gender: genderEnum("gender").notNull(),
-    studyingClass: integer("studying_class").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (t) => ({
-    schoolClassIdx: uniqueIndex("students_school_name_idx").on(
-      t.schoolId,
-      t.name,
-      t.studyingClass,
-    ),
-  }),
-);
+export const students = pgTable("students", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id")
+    .notNull()
+    .references(() => schools.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 200 }).notNull(),
+  gender: genderEnum("gender").notNull(),
+  studyingClass: integer("studying_class").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 /* ------------------------------------------------------------------ */
 /*  Categories (class-range grouping, e.g. "Sub-Junior" = classes 3-5) */

@@ -36,14 +36,28 @@ export const studentsRouter = router({
         const before = await db.query.students.findFirst({ where: eq(students.id, input.id) });
         if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Student not found" });
         if (role !== "admin" && before.schoolId !== sessionSchoolId) throw new TRPCError({ code: "FORBIDDEN", message: "Cannot update other school student" });
-        const [updated] = await db.update(students).set(input.data).where(eq(students.id, input.id)).returning();
-        if (updated)
-          await db.insert(auditLogs).values({ userId: actorId, action: "update", entityType: "student", entityId: updated.id, changes: { before, after: updated }, ipAddress: ip });
-        return updated;
+        try {
+          const [updated] = await db.update(students).set(input.data).where(eq(students.id, input.id)).returning();
+          if (updated)
+            await db.insert(auditLogs).values({ userId: actorId, action: "update", entityType: "student", entityId: updated.id, changes: { before, after: updated }, ipAddress: ip });
+          return updated;
+        } catch (e: any) {
+          if (e?.code === "23505" || e?.cause?.code === "23505" || String(e?.message).includes("students_school_name_idx")) {
+            throw new TRPCError({ code: "CONFLICT", message: `Student "${input.data.name}" already exists in class ${input.data.studyingClass} for this school` });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e.message });
+        }
       }
-      const [created] = await db.insert(students).values(input.data).returning();
-      if (created)
-        await db.insert(auditLogs).values({ userId: actorId, action: "create", entityType: "student", entityId: created.id, changes: { after: created }, ipAddress: ip });
-      return created;
+      try {
+        const [created] = await db.insert(students).values(input.data).returning();
+        if (created)
+          await db.insert(auditLogs).values({ userId: actorId, action: "create", entityType: "student", entityId: created.id, changes: { after: created }, ipAddress: ip });
+        return created;
+      } catch (e: any) {
+        if (e?.code === "23505" || e?.cause?.code === "23505" || String(e?.message).includes("students_school_name_idx") || String(e?.message).includes("duplicate")) {
+          throw new TRPCError({ code: "CONFLICT", message: `Student "${input.data.name}" already exists in class ${input.data.studyingClass} for this school` });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e.message });
+      }
     }),
 });

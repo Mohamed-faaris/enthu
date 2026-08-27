@@ -3,10 +3,16 @@ import { TRPCError } from "@trpc/server";
 import { db } from "@enthu/db";
 import { auditLogs, events } from "@enthu/db/schema";
 import { eventSchema } from "@enthu/validators";
-import { adminProcedure, protectedProcedure, router } from "../index";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "../index";
 import { z } from "zod";
 
 export const eventsRouter = router({
+  publicList: publicProcedure.query(async () => {
+    return db.query.events.findMany({
+      with: { category: true },
+      orderBy: (e, { asc }) => [asc(e.name)],
+    });
+  }),
   list: protectedProcedure.query(async () => {
     return db.query.events.findMany({
       with: { category: true },

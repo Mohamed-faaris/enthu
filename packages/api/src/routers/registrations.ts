@@ -16,7 +16,8 @@ import {
   checkEligibilitySchema,
   idSchema,
 } from "@enthu/validators";
-import { adminProcedure, protectedProcedure, router } from "../index";
+import { z } from "zod";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "../index";
 
 async function checkEligibilityHelper(eventId: string, studentIds: string[]) {
   const eventRow = await db.query.events.findFirst({
@@ -461,6 +462,14 @@ export const registrationsRouter = router({
     if (!sid) return [];
     return db.query.registrations.findMany({
       where: eq(registrations.schoolId, sid),
+      with: { event: true, student: true, team: { with: { members: { with: { student: true } } } } },
+      orderBy: (r, { desc }) => [desc(r.createdAt)],
+    });
+  }),
+
+  publicListBySchool: publicProcedure.input(z.object({ schoolId: z.string().uuid() })).query(async ({ input }) => {
+    return db.query.registrations.findMany({
+      where: eq(registrations.schoolId, input.schoolId),
       with: { event: true, student: true, team: { with: { members: { with: { student: true } } } } },
       orderBy: (r, { desc }) => [desc(r.createdAt)],
     });

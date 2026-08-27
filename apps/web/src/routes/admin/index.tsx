@@ -26,6 +26,10 @@ function AdminDashboard() {
           <h3 className="font-medium">Registrations</h3>
           <p className="text-sm text-muted-foreground">Full details page + new & edit dialogs</p>
         </Link>
+        <Link to="/admin/create-user" className="rounded-none border p-4 hover:bg-muted">
+          <h3 className="font-medium">Users</h3>
+          <p className="text-sm text-muted-foreground">Create users with roles & reset passwords</p>
+        </Link>
       </div>
     </div>
   );

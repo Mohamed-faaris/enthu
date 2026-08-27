@@ -32,6 +32,9 @@ function AdminLayout() {
         <Link to="/admin/registrations" className="hover:underline font-medium">
           Registrations
         </Link>
+        <Link to="/admin/create-user" className="hover:underline">
+          Users
+        </Link>
       </nav>
       <Outlet />
     </div>

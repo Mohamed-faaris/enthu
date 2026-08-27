@@ -19,8 +19,8 @@ function RegistrationDetailsPage() {
         eventId: string;
         school: { name: string; code: string };
         event: { name: string; gender: string; eventType: string; scoringType: string; category: { name: string; minClass: number; maxClass: number } };
-        student: { firstName: string; lastName: string; gender: string; studyingClass: number; bibId: string | null } | null;
-        team: { name: string | null; members: Array<{ student: { firstName: string; lastName: string; gender: string; studyingClass: number } }> } | null;
+        student: { name: string; gender: string; studyingClass: number } | null;
+        team: { name: string | null; members: Array<{ student: { name: string; gender: string; studyingClass: number } }> } | null;
         status: string;
         isAdminOverride: boolean;
         overrideReason: string | null;
@@ -76,15 +76,14 @@ function RegistrationDetailsPage() {
         <CardContent>
           {data.student ? (
             <div className="text-sm">
-              <div><span className="text-muted-foreground">Student:</span> {data.student.firstName} {data.student.lastName} ({data.student.gender}, class {data.student.studyingClass})</div>
-              {data.student.bibId && <div><span className="text-muted-foreground">BIB:</span> {data.student.bibId}</div>}
+              <div><span className="text-muted-foreground">Student:</span> {data.student.name} ({data.student.gender}, class {data.student.studyingClass})</div>
             </div>
           ) : data.team ? (
             <div className="space-y-2">
               <div className="text-sm"><span className="text-muted-foreground">Team:</span> {data.team.name ?? "Unnamed team"} — {data.team.members.length} members</div>
               <ul className="list-disc pl-5 text-sm">
                 {data.team.members.map((m, i) => (
-                  <li key={i}>{m.student.firstName} {m.student.lastName} ({m.student.gender}, class {m.student.studyingClass})</li>
+                  <li key={i}>{m.student.name} ({m.student.gender}, class {m.student.studyingClass})</li>
                 ))}
               </ul>
             </div>

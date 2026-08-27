@@ -213,6 +213,37 @@ function EventsPage() {
           { header: "Type", cell: (r) => (r as unknown as EventRow).eventType },
           { header: "Scoring", cell: (r) => (r as unknown as EventRow).scoringType },
           {
+            header: "Team size",
+            cell: (r) => {
+              const e = r as unknown as EventRow;
+              if (e.eventType !== "team") return "—";
+              const min = e.teamMinMembers ?? "–";
+              const max = e.teamMaxMembers ?? "–";
+              return min === max ? `${min}` : `${min}–${max}`;
+            },
+          },
+          {
+            header: "Min/Max members (individual)",
+            cell: (r) => {
+              const e = r as unknown as EventRow;
+              if (e.eventType !== "individual") return "—";
+              const min = e.minTeamsPerSchool ?? "–";
+              const max = e.maxTeamsPerSchool ?? "–";
+              return `${min} / ${max}`;
+            },
+          },
+          {
+            header: "Max teams / participants",
+            cell: (r) => {
+              const e = r as unknown as EventRow;
+              if (e.eventType !== "team") return "—";
+              const maxTeams = e.maxTeamsPerSchool ?? "∞";
+              const maxMembers = e.teamMaxMembers ?? "?";
+              const minTeams = e.minTeamsPerSchool ?? 1;
+              return `${minTeams}–${maxTeams} teams (≤${maxMembers}/team)`;
+            },
+          },
+          {
             header: "Closes",
             cell: (r) => {
               const d = (r as unknown as EventRow).registrationClosesAt;
@@ -290,23 +321,41 @@ function EventsPage() {
               </select>
             </div>
           </div>
-          {form.eventType === "team" && (
-            <div className="grid grid-cols-4 gap-2">
+          {form.eventType === "individual" ? (
+            <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>Min members</Label>
-                <Input type="number" min={1} value={form.teamMinMembers} onChange={(e) => setForm({ ...form, teamMinMembers: e.target.value })} placeholder="e.g. 4" />
-              </div>
-              <div className="space-y-2">
-                <Label>Max members</Label>
-                <Input type="number" min={1} value={form.teamMaxMembers} onChange={(e) => setForm({ ...form, teamMaxMembers: e.target.value })} placeholder="e.g. 6" />
-              </div>
-              <div className="space-y-2">
-                <Label>Min teams/school</Label>
+                <Label>Min members (individual per school)</Label>
                 <Input type="number" min={1} value={form.minTeamsPerSchool} onChange={(e) => setForm({ ...form, minTeamsPerSchool: e.target.value })} placeholder="e.g. 1" />
               </div>
               <div className="space-y-2">
-                <Label>Max teams/school</Label>
-                <Input type="number" min={1} value={form.maxTeamsPerSchool} onChange={(e) => setForm({ ...form, maxTeamsPerSchool: e.target.value })} />
+                <Label>Max participants per school</Label>
+                <Input type="number" min={1} value={form.maxTeamsPerSchool} onChange={(e) => setForm({ ...form, maxTeamsPerSchool: e.target.value })} placeholder="e.g. 2" />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>Team size — Min members</Label>
+                  <Input type="number" min={1} value={form.teamMinMembers} onChange={(e) => setForm({ ...form, teamMinMembers: e.target.value })} placeholder="e.g. 4" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Team size — Max members</Label>
+                  <Input type="number" min={1} value={form.teamMaxMembers} onChange={(e) => setForm({ ...form, teamMaxMembers: e.target.value })} placeholder="e.g. 6" />
+                </div>
+              </div>
+              {form.teamMinMembers && form.teamMaxMembers && form.teamMinMembers === form.teamMaxMembers && (
+                <p className="text-xs text-muted-foreground">Fixed team size: {form.teamMinMembers} members</p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>Min teams / school</Label>
+                  <Input type="number" min={1} value={form.minTeamsPerSchool} onChange={(e) => setForm({ ...form, minTeamsPerSchool: e.target.value })} placeholder="e.g. 1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max teams / school (participants cap)</Label>
+                  <Input type="number" min={1} value={form.maxTeamsPerSchool} onChange={(e) => setForm({ ...form, maxTeamsPerSchool: e.target.value })} placeholder="e.g. 2" />
+                </div>
               </div>
             </div>
           )}

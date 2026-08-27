@@ -64,18 +64,15 @@ export const students = pgTable(
     schoolId: uuid("school_id")
       .notNull()
       .references(() => schools.id, { onDelete: "cascade" }),
-    firstName: varchar("first_name", { length: 100 }).notNull(),
-    lastName: varchar("last_name", { length: 100 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
     gender: genderEnum("gender").notNull(),
     studyingClass: integer("studying_class").notNull(),
-    bibId: varchar("bib_id", { length: 20 }).unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     schoolClassIdx: uniqueIndex("students_school_name_idx").on(
       t.schoolId,
-      t.firstName,
-      t.lastName,
+      t.name,
       t.studyingClass,
     ),
   }),

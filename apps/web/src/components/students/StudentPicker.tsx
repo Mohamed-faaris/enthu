@@ -18,7 +18,7 @@ export function StudentPicker({
   if (!schoolId) return <p className="text-sm text-muted-foreground">Select a school first</p>;
   if (q.isLoading) return <p className="text-sm">Loading students…</p>;
 
-  const students = (q.data as unknown as Array<{ id: string; firstName: string; lastName: string; studyingClass: number; gender: string }>) ?? [];
+  const students = (q.data as unknown as Array<{ id: string; name: string; studyingClass: number; gender: string }>) ?? [];
 
   return (
     <select
@@ -29,7 +29,7 @@ export function StudentPicker({
       <option value="">— select student —</option>
       {students.map((s) => (
         <option key={s.id} value={s.id}>
-          {s.firstName} {s.lastName} (Class {s.studyingClass}, {s.gender})
+          {s.name} (Class {s.studyingClass}, {s.gender})
         </option>
       ))}
     </select>

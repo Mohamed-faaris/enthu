@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { trpc } from "@/utils/trpc";
@@ -129,6 +129,9 @@ function SchoolsPage() {
               const row = r as unknown as SchoolRow;
               return (
                 <div className="flex gap-2">
+                  <Link to="/admin/schools/$schoolId" params={{ schoolId: row.id }} className="text-xs text-primary hover:underline">
+                    View
+                  </Link>
                   <button onClick={() => openEdit(row)} className="text-xs text-primary hover:underline">
                     Edit
                   </button>

@@ -12,7 +12,7 @@ function TeamsPage() {
   const session = authClient.useSession();
   const schoolId = (session.data?.user as unknown as { schoolId?: string } | undefined)?.schoolId;
   const q = useQuery({ ...trpc.teams.listBySchool.queryOptions({ schoolId: schoolId ?? "" }), enabled: !!schoolId });
-  const rows = (q.data as unknown as Array<{ id: string; name: string | null; event: { name: string }; members: Array<{ student: { firstName: string } }> }>) ?? [];
+  const rows = (q.data as unknown as Array<{ id: string; name: string | null; event: { name: string }; members: Array<{ student: { name: string } }> }>) ?? [];
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium">Teams</h2>

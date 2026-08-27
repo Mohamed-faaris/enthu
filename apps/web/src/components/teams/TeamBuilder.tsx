@@ -21,7 +21,7 @@ export function TeamBuilder({
     ...trpc.students.listBySchool.queryOptions({ schoolId: schoolId ?? "" }),
     enabled: !!schoolId,
   });
-  const students = (q.data as unknown as Array<{ id: string; firstName: string; lastName: string }>) ?? [];
+  const students = (q.data as unknown as Array<{ id: string; name: string }>) ?? [];
 
   const add = () => {
     if (pick && !value.includes(pick)) onChange([...value, pick]);
@@ -42,7 +42,7 @@ export function TeamBuilder({
           <option value="">— add member —</option>
           {students.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.firstName} {s.lastName}
+              {s.name}
             </option>
           ))}
         </select>
@@ -55,7 +55,7 @@ export function TeamBuilder({
           const s = students.find((x) => x.id === id);
           return (
             <li key={id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-              <span>{s ? `${s.firstName} ${s.lastName}` : id}</span>
+              <span>{s ? s.name : id}</span>
               <button type="button" onClick={() => remove(id)} className="text-red-600 text-xs">
                 Remove
               </button>

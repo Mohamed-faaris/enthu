@@ -6,8 +6,6 @@ import { Button } from "@enthu/ui/components/button";
 import { Input } from "@enthu/ui/components/input";
 import { Label } from "@enthu/ui/components/label";
 import { Card } from "@enthu/ui/components/card";
-import { StudentPicker } from "@/components/students/StudentPicker";
-import { TeamBuilder } from "@/components/teams/TeamBuilder";
 import { EligibilityBadge } from "./EligibilityBadge";
 import { OverrideWarningBanner } from "./OverrideWarningBanner";
 import { toast } from "sonner";
@@ -15,6 +13,8 @@ import { authClient } from "@/lib/auth-client";
 
 type Props = {
   isAdminContext?: boolean;
+  fixedSchoolId?: string;
+  fixedEventId?: string;
   initialData?: {
     id?: string;
     schoolId: string;
@@ -28,26 +28,35 @@ type Props = {
   };
 };
 
-export function RegistrationForm({ isAdminContext = false, initialData }: Props) {
+export function RegistrationForm({ isAdminContext = false, fixedSchoolId, fixedEventId, initialData }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const session = authClient.useSession();
   const sessionSchoolId = (session.data?.user as unknown as { schoolId?: string } | undefined)?.schoolId ?? null;
-  const [schoolId, setSchoolId] = useState(initialData?.schoolId ?? "");
-  const [eventId, setEventId] = useState(initialData?.eventId ?? "");
+  const [schoolId, setSchoolId] = useState(initialData?.schoolId ?? fixedSchoolId ?? "");
+  const [eventId, setEventId] = useState(initialData?.eventId ?? fixedEventId ?? "");
 
   useEffect(() => {
     if (!isAdminContext && !initialData?.schoolId && sessionSchoolId && !schoolId) setSchoolId(sessionSchoolId);
   }, [sessionSchoolId, isAdminContext, initialData?.schoolId, schoolId]);
+  useEffect(() => {
+    if (fixedEventId && !initialData?.eventId) setEventId(fixedEventId);
+  }, [fixedEventId, initialData?.eventId]);
+  useEffect(() => {
+    if (fixedSchoolId && !initialData?.schoolId) setSchoolId(fixedSchoolId);
+  }, [fixedSchoolId, initialData?.schoolId]);
+
   const [studentId, setStudentId] = useState<string | null>(initialData?.studentId ?? null);
   const [teamId, setTeamId] = useState<string | null>(initialData?.teamId ?? null);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>(initialData?.teamMemberIds ?? []);
   const [teamName, setTeamName] = useState(initialData?.teamName ?? "");
-  const [status, setStatus] = useState(initialData?.status ?? "pending");
-  const [overrideReason, setOverrideReason] = useState(initialData?.overrideReason ?? "");
 
   const schoolsQ = useQuery(trpc.schools.list.queryOptions());
   const eventsQ = useQuery(trpc.events.list.queryOptions());
+  const studentsBySchoolQ = useQuery({
+    ...trpc.students.listBySchool.queryOptions({ schoolId: schoolId || "" }),
+    enabled: !!schoolId,
+  });
 
   const selectedEvent = (eventsQ.data as unknown as Array<{ id: string; eventType: string; name: string; registrationClosesAt: string | null }> | undefined)?.find(
     (e) => e.id === eventId
@@ -62,34 +71,113 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
     enabled: !!eventId && (isTeamEvent ? teamMemberIds.length > 0 : !!studentId),
   });
 
-  const upsert = useMutation(
+  // inline student creation — single name field, created together with registration
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [newStudent, setNewStudent] = useState({ name: "", gender: "male" as "male" | "female", studyingClass: 5 });
+  const [newTeamStudent, setNewTeamStudent] = useState({ name: "", gender: "male" as "male" | "female", studyingClass: 5 });
+  const [pendingTeamMembers, setPendingTeamMembers] = useState<Array<{ name: string; gender: "male" | "female"; studyingClass: number }>>([]);
+
+  const createStudent = useMutation(trpc.students.upsert.mutationOptions());
+
+  const adminUpsert = useMutation(
     trpc.registrations.adminUpsert.mutationOptions({
-      onSuccess: async (data) => {
+      onSuccess: async () => {
         toast.success(initialData?.id ? "Registration updated" : "Registration created");
         await qc.invalidateQueries({ queryKey: trpc.registrations.adminList.queryKey() });
+        await qc.invalidateQueries({ queryKey: trpc.registrations.schoolList.queryKey() });
         await qc.invalidateQueries({ queryKey: trpc.students.listBySchool.queryKey({ schoolId }) });
-        if (isAdminContext) navigate({ to: "/admin/registrations" });
+        if (isAdminContext && !fixedSchoolId && !fixedEventId) navigate({ to: "/admin/registrations" });
       },
       onError: (e) => toast.error(e.message),
     })
   );
+  const schoolUpsert = useMutation(
+    trpc.registrations.schoolUpsert.mutationOptions({
+      onSuccess: async () => {
+        toast.success(initialData?.id ? "Registration updated" : "Registration created");
+        await qc.invalidateQueries({ queryKey: trpc.registrations.adminList.queryKey() });
+        await qc.invalidateQueries({ queryKey: trpc.registrations.schoolList.queryKey() });
+        await qc.invalidateQueries({ queryKey: trpc.students.listBySchool.queryKey({ schoolId }) });
+      },
+      onError: (e) => toast.error(e.message),
+    })
+  );
+  const upsert = isAdminContext ? adminUpsert : schoolUpsert;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schoolId || !eventId) {
+    const resolvedSchoolId = fixedSchoolId ?? schoolId;
+    const resolvedEventId = fixedEventId ?? eventId;
+    if (!resolvedSchoolId || !resolvedEventId) {
       toast.error("School and event are required");
       return;
     }
+
+    let finalStudentId = studentId;
+    let finalTeamMemberIds = [...teamMemberIds];
+
+    // create student inline together with registration — no dropdown, single submit
+    if (!isTeamEvent && !finalStudentId && newStudent.name.trim()) {
+      try {
+        const created: any = await createStudent.mutateAsync({
+          data: {
+            schoolId: resolvedSchoolId,
+            name: newStudent.name.trim(),
+            gender: newStudent.gender,
+            studyingClass: Number(newStudent.studyingClass),
+          },
+        } as never);
+        finalStudentId = created.id;
+        await qc.invalidateQueries({ queryKey: trpc.students.listBySchool.queryKey({ schoolId: resolvedSchoolId }) });
+        setNewStudent({ name: "", gender: "male", studyingClass: 5 });
+      } catch (err: any) {
+        return toast.error(err.message);
+      }
+    }
+
+    // pending team members (added via Add member button) + current inline input if filled
+    const teamMembersToCreate = [...pendingTeamMembers];
+    if (isTeamEvent && newTeamStudent.name.trim()) {
+      teamMembersToCreate.push({ ...newTeamStudent, name: newTeamStudent.name.trim() });
+    }
+    for (const m of teamMembersToCreate) {
+      try {
+        const created: any = await createStudent.mutateAsync({
+          data: {
+            schoolId: resolvedSchoolId,
+            name: m.name.trim(),
+            gender: m.gender,
+            studyingClass: Number(m.studyingClass),
+          },
+        } as never);
+        finalTeamMemberIds = [...finalTeamMemberIds, created.id];
+      } catch (err: any) {
+        return toast.error((err as any).message);
+      }
+    }
+    if (teamMembersToCreate.length > 0) {
+      await qc.invalidateQueries({ queryKey: trpc.students.listBySchool.queryKey({ schoolId: resolvedSchoolId }) });
+      setPendingTeamMembers([]);
+      setNewTeamStudent({ name: "", gender: "male", studyingClass: 5 });
+    }
+
+    if (!isTeamEvent && !finalStudentId) {
+      return toast.error("Select existing student or add new student name");
+    }
+    if (isTeamEvent && finalTeamMemberIds.length === 0) {
+      return toast.error("Add at least one team member (existing or new)");
+    }
+
     upsert.mutate({
       id: initialData?.id,
-      schoolId,
-      eventId,
-      studentId: isTeamEvent ? null : studentId,
+      schoolId: resolvedSchoolId,
+      eventId: resolvedEventId,
+      studentId: isTeamEvent ? null : finalStudentId,
       teamId: isTeamEvent ? teamId : null,
-      teamMemberIds: isTeamEvent && !teamId ? teamMemberIds : undefined,
+      teamMemberIds: isTeamEvent && !teamId ? finalTeamMemberIds : undefined,
       teamName: isTeamEvent ? teamName || null : undefined,
-      status: status as "pending" | "confirmed" | "rejected" | "withdrawn",
-      overrideReason: overrideReason || null,
+      status: "confirmed",
+      overrideReason: null,
     } as never);
   };
 
@@ -97,10 +185,21 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
     | { eligible: boolean; reasons: string[]; isDeadlinePassed?: boolean; registrationClosesAt?: string | null }
     | undefined;
 
+  const eventLocked = !!fixedEventId;
+  const isSubmitting = upsert.isPending || createStudent.isPending;
+
   return (
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {isAdminContext ? (
+        {fixedSchoolId ? (
+          <div className="space-y-2">
+            <Label>School</Label>
+            <p className="text-sm font-medium">
+              {(schoolsQ.data as unknown as Array<{ id: string; name: string }> | undefined)?.find((s) => s.id === fixedSchoolId)?.name ?? fixedSchoolId}
+            </p>
+            <p className="text-xs text-muted-foreground">Locked to this school</p>
+          </div>
+        ) : isAdminContext ? (
           <div className="space-y-2">
             <Label>School *</Label>
             <select
@@ -129,46 +228,175 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label>Event *</Label>
-          <select
-            value={eventId}
-            onChange={(e) => {
-              setEventId(e.target.value);
-              setStudentId(null);
-              setTeamId(null);
-              setTeamMemberIds([]);
-            }}
-            className="w-full rounded-md border px-3 py-2 bg-background"
-            required
-          >
-            <option value="">— select event —</option>
-            {(eventsQ.data as unknown as Array<{ id: string; name: string; gender: string; eventType: string }> | undefined)?.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name} ({ev.gender}, {ev.eventType})
-              </option>
-            ))}
-          </select>
-        </div>
+        {eventLocked ? (
+          <div className="space-y-2">
+            <Label>Event</Label>
+            <p className="text-sm font-medium">
+              {(eventsQ.data as unknown as Array<{ id: string; name: string }> | undefined)?.find((ev) => ev.id === fixedEventId)?.name ?? fixedEventId}
+            </p>
+            <p className="text-xs text-muted-foreground">Locked to this event (team auto-created inline)</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Event *</Label>
+            <select
+              value={eventId}
+              onChange={(e) => {
+                setEventId(e.target.value);
+                setStudentId(null);
+                setTeamId(null);
+                setTeamMemberIds([]);
+              }}
+              className="w-full rounded-md border px-3 py-2 bg-background"
+              required
+            >
+              <option value="">— select event —</option>
+              {(eventsQ.data as unknown as Array<{ id: string; name: string; gender: string; eventType: string }> | undefined)?.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({ev.gender}, {ev.eventType})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {eventId && !isTeamEvent && (
-          <div className="space-y-2">
-            <Label>Student *</Label>
-            <StudentPicker schoolId={schoolId || null} value={studentId} onChange={setStudentId} />
+          <div className="space-y-3">
+            {initialData?.id && studentId ? (
+              <div className="space-y-2">
+                <Label>Student</Label>
+                <p className="text-sm font-medium">
+                  {(studentsBySchoolQ.data as unknown as Array<{ id: string; name: string }> | undefined)?.find((s) => s.id === studentId)?.name ?? studentId}
+                </p>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setStudentId(null); setShowAddStudent(true); }}>
+                  Change student
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+                <p className="text-xs font-medium">New student — will be created together with registration on submit (no dropdown)</p>
+                <div className="space-y-1">
+                  <Label>Name *</Label>
+                  <Input value={newStudent.name} onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })} placeholder="Full name" required />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label>Gender</Label>
+                    <select value={newStudent.gender} onChange={(e) => setNewStudent({ ...newStudent, gender: e.target.value as any })} className="w-full rounded-md border px-2 py-2 bg-background text-sm">
+                      <option value="male">male</option>
+                      <option value="female">female</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Class</Label>
+                    <Input type="number" min={1} max={12} value={newStudent.studyingClass} onChange={(e) => setNewStudent({ ...newStudent, studyingClass: Number(e.target.value) })} required />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {eventId && isTeamEvent && (
-          <div className="space-y-2">
-            <Label>Team</Label>
-            <TeamBuilder
-              schoolId={schoolId || null}
-              value={teamMemberIds}
-              onChange={setTeamMemberIds}
-              teamName={teamName}
-              onTeamNameChange={setTeamName}
-            />
-            {teamId && <p className="text-xs text-muted-foreground">Editing existing team {teamId}</p>}
+          <div className="space-y-3">
+            <Label>Team (auto-created inline — no dropdown)</Label>
+            <div className="space-y-2">
+              <Label>Team name (optional)</Label>
+              <Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Team A" />
+            </div>
+            {teamMemberIds.length > 0 && (
+              <div className="space-y-2">
+                <Label>Added members ({teamMemberIds.length})</Label>
+                <ul className="space-y-1">
+                  {teamMemberIds.map((id) => {
+                    const s = (studentsBySchoolQ.data as unknown as Array<{ id: string; name: string; gender: "male" | "female"; studyingClass: number }> | undefined)?.find((x) => x.id === id);
+                    return (
+                      <li key={id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                        <span>{s?.name ?? id}</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (s) setNewTeamStudent({ name: s.name, gender: s.gender, studyingClass: s.studyingClass });
+                              setTeamMemberIds((prev) => prev.filter((x) => x !== id));
+                            }}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => setTeamMemberIds((prev) => prev.filter((x) => x !== id))} className="text-xs text-red-600">Remove</button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {teamId && <p className="text-xs text-muted-foreground">Editing existing team {teamId} — new members will be updated inline</p>}
+            <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+              <p className="text-xs font-medium">Add team members — each will be created with registration on submit (no dropdown)</p>
+              {pendingTeamMembers.length > 0 && (
+                <div className="space-y-1">
+                  <Label>Pending new members ({pendingTeamMembers.length})</Label>
+                  <ul className="space-y-1">
+                    {pendingTeamMembers.map((m, idx) => (
+                      <li key={idx} className="flex items-center justify-between rounded border bg-background px-2 py-1 text-xs">
+                        <span>{m.name} ({m.gender}, class {m.studyingClass})</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewTeamStudent({ name: m.name, gender: m.gender, studyingClass: m.studyingClass });
+                              setPendingTeamMembers((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => setPendingTeamMembers((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-red-600">Remove</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label>Name {teamMemberIds.length === 0 && pendingTeamMembers.length === 0 ? "*" : "(add more)"}</Label>
+                <Input value={newTeamStudent.name} onChange={(e) => setNewTeamStudent({ ...newTeamStudent, name: e.target.value })} placeholder="Full name" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>Gender</Label>
+                  <select value={newTeamStudent.gender} onChange={(e) => setNewTeamStudent({ ...newTeamStudent, gender: e.target.value as any })} className="w-full rounded-md border px-2 py-2 bg-background text-sm">
+                    <option value="male">male</option>
+                    <option value="female">female</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Class</Label>
+                  <Input type="number" min={1} max={12} value={newTeamStudent.studyingClass} onChange={(e) => setNewTeamStudent({ ...newTeamStudent, studyingClass: Number(e.target.value) })} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (!newTeamStudent.name.trim()) return toast.error("Name required");
+                    setPendingTeamMembers((prev) => [...prev, { ...newTeamStudent, name: newTeamStudent.name.trim() }]);
+                    setNewTeamStudent({ name: "", gender: "male", studyingClass: 5 });
+                  }}
+                >
+                  + Add member to team list
+                </Button>
+                {pendingTeamMembers.length > 0 && (
+                  <span className="text-xs text-muted-foreground self-center">Will create {pendingTeamMembers.length + (newTeamStudent.name.trim() ? 1 : 0)} new member(s) on submit</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Click + to queue members, then submit registration once. Team will be auto-created inline.</p>
+            </div>
+            <p className="text-xs text-muted-foreground">Team will be created automatically on submit — no separate team step, no dropdown.</p>
           </div>
         )}
 
@@ -189,36 +417,14 @@ export function RegistrationForm({ isAdminContext = false, initialData }: Props)
           </div>
         )}
 
-        {/* Always show deadline banner if event selected and deadline passed, even before eligibility query resolves */}
         {!eligibility && selectedEvent?.registrationClosesAt && new Date(selectedEvent.registrationClosesAt) < new Date() && (
           <OverrideWarningBanner registrationClosesAt={selectedEvent.registrationClosesAt} isDeadlinePassed />
         )}
 
-        <div className="space-y-2">
-          <Label>Status</Label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-md border px-3 py-2 bg-background">
-            <option value="pending">pending</option>
-            <option value="confirmed">confirmed</option>
-            <option value="rejected">rejected</option>
-            <option value="withdrawn">withdrawn</option>
-          </select>
-        </div>
-
-        {isAdminContext && (
-          <div className="space-y-2">
-            <Label>Override reason (recommended if deadline override)</Label>
-            <Input
-              placeholder="Why is this override needed? (recommended)"
-              value={overrideReason}
-              onChange={(e) => setOverrideReason(e.target.value)}
-              maxLength={255}
-            />
-          </div>
-        )}
-
-        <Button type="submit" disabled={upsert.isPending} className="w-full">
-          {upsert.isPending ? "Saving…" : initialData?.id ? "Update registration" : "Create registration"}
+        <Button type="submit" disabled={isSubmitting} className="w-full">
+          {isSubmitting ? "Saving…" : initialData?.id ? "Update registration (confirmed)" : "Create registration (confirmed)"}
         </Button>
+        <p className="text-xs text-center text-muted-foreground">Status always confirmed — no override needed. New student/team created inline on submit.</p>
       </form>
     </Card>
   );

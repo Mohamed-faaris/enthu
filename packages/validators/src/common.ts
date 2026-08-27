@@ -8,7 +8,7 @@ export const paginationSchema = z.object({
 export const schoolSchema = z.object({
   name: z.string().min(1).max(255),
   code: z.string().min(1).max(50),
-  contactEmail: z.string().email().max(255).nullable().optional(),
+  contactEmail: z.email().max(255).nullable().optional(),
   contactPhone: z.string().max(30).nullable().optional(),
   isActive: z.boolean().default(true).optional(),
 });
@@ -36,9 +36,7 @@ export const eventSchema = z.object({
 
 export const studentSchema = z.object({
   schoolId: z.string().uuid(),
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
   gender: z.enum(["male", "female"]),
   studyingClass: z.number().int().min(1).max(12),
-  bibId: z.string().max(20).nullable().optional(),
 });

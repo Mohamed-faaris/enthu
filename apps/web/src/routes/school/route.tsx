@@ -5,9 +5,15 @@ export const Route = createFileRoute("/school")({
   beforeLoad: async () => {
     const session = await authClient.getSession();
     const role = (session?.data?.user as unknown as { role?: string } | undefined)?.role;
-    if (session?.data?.user && role !== "school_spoc" && role !== "admin") {
-      throw redirect({ to: "/login" });
+    const localSchoolId = typeof window !== "undefined" ? localStorage.getItem("schoolId") : null;
+    // allow if: admin/school_spoc session, OR school code login (localStorage)
+    if (session?.data?.user) {
+      if (role !== "school_spoc" && role !== "admin") throw redirect({ to: "/login" });
+      return;
     }
+    if (localSchoolId) return;
+    // not logged in at all -> go to portal where school login dropdown lives
+    throw redirect({ to: "/" });
   },
   component: SchoolLayout,
 });

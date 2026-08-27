@@ -17,7 +17,9 @@ export const Route = createFileRoute("/school/registrations/")({
 
 function SchoolRegistrationsPage() {
   const session = authClient.useSession();
-  const schoolId = (session.data?.user as unknown as { schoolId?: string } | undefined)?.schoolId ?? "";
+  const sessionSchoolId = (session.data?.user as unknown as { schoolId?: string } | undefined)?.schoolId ?? "";
+  const localSchoolId = typeof window !== "undefined" ? localStorage.getItem("schoolId") ?? "" : "";
+  const schoolId = sessionSchoolId || localSchoolId;
   const qc = useQueryClient();
   const eventsQ = useQuery(trpc.events.list.queryOptions());
   const regsQ = useQuery(trpc.registrations.schoolList.queryOptions());

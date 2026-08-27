@@ -162,10 +162,16 @@ export function RegistrationForm({ isAdminContext = false, fixedSchoolId, fixedE
     }
 
     if (!isTeamEvent && !finalStudentId) {
-      return toast.error("Select existing student or add new student name");
+      toast.error("Add new student name");
+      return;
     }
     if (isTeamEvent && finalTeamMemberIds.length === 0) {
-      return toast.error("Add at least one team member (existing or new)");
+      toast.error("Add at least one team member");
+      return;
+    }
+    if (!hasPendingCreation && eligibility && !eligibility.eligible) {
+      toast.error(`Not eligible: ${eligibility.reasons.join("; ")}`);
+      return;
     }
 
     upsert.mutate({
@@ -187,6 +193,17 @@ export function RegistrationForm({ isAdminContext = false, fixedSchoolId, fixedE
 
   const eventLocked = !!fixedEventId;
   const isSubmitting = upsert.isPending || createStudent.isPending;
+  const hasPendingCreation = isTeamEvent
+    ? pendingTeamMembers.length > 0 || newTeamStudent.name.trim().length > 0
+    : newStudent.name.trim().length > 0;
+  const hasEntrant = isTeamEvent
+    ? teamMemberIds.length > 0 || hasPendingCreation
+    : !!studentId || hasPendingCreation;
+  // if pending creation exists, skip eligibility disable (will be validated after creation/backend)
+  const isEligible = hasPendingCreation ? true : eligibility ? eligibility.eligible : true;
+  const canSubmit = !! (fixedSchoolId ?? schoolId) && !! (fixedEventId ?? eventId) && hasEntrant && isEligible && !isSubmitting;
+  const eligibilityErrorText = eligibility && !eligibility.eligible ? eligibility.reasons.join("; ") : null;
+  const submitErrorText = (upsert.error as any)?.message || (createStudent.error as any)?.message || null;
 
   return (
     <Card className="p-6">
@@ -421,10 +438,13 @@ export function RegistrationForm({ isAdminContext = false, fixedSchoolId, fixedE
           <OverrideWarningBanner registrationClosesAt={selectedEvent.registrationClosesAt} isDeadlinePassed />
         )}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full">
+        {eligibilityErrorText && <p className="text-xs text-red-600">Not eligible: {eligibilityErrorText}</p>}
+        {submitErrorText && <p className="text-xs text-red-600">Error while creating: {submitErrorText}</p>}
+        {!hasEntrant && <p className="text-xs text-amber-600">Add a student / team member to enable Create</p>}
+        <Button type="submit" disabled={!canSubmit} className="w-full">
           {isSubmitting ? "Saving…" : initialData?.id ? "Update registration (confirmed)" : "Create registration (confirmed)"}
         </Button>
-        <p className="text-xs text-center text-muted-foreground">Status always confirmed — no override needed. New student/team created inline on submit.</p>
+        <p className="text-xs text-center text-muted-foreground">Status always confirmed — no override needed. New student/team created inline on submit.{!canSubmit && hasEntrant && eligibilityErrorText ? " Fix eligibility to enable." : ""}</p>
       </form>
     </Card>
   );
